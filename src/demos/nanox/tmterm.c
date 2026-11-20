@@ -34,7 +34,7 @@
 #define STDROW 50
 #define KBDBUF 10240
 #endif
-#define TITLE "tmterm"
+#define TITLE "nxterm"
 
 /* Color definitions */
 #define GR_COLOR_WHITESMOKE MWRGB(245, 245, 245)
@@ -259,30 +259,6 @@ tmt_callback(tmt_msg_t m, TMT *v, const void *a, void *p)
     if (!vt) return;
     
     switch (m) {
-#ifdef TMT_HAS_MSG_SCROLL
-    case TMT_MSG_SCROLL:
-        if (tmt_screen(vt)->update.dirty)
-            draw_screen();
-        tmt_dirty(vt, 0, STDROW - 1, STDCOL, 1);
-        hide_cursor();
-        GrCopyArea(w1, gc1, 0, 0, STDCOL * fonw, (STDROW - 1) * fonh,
-                   w1, 0, fonh, MWROP_COPY);
-        GrSetGCForeground(gc1, stdbackground);
-        GrFillRect(w1, gc1, 0, (STDROW - 1) * fonh,
-                   STDCOL * fonw, fonh);
-        GrSetGCForeground(gc1, gi.foreground);
-        break;
-#endif
-
-    case TMT_MSG_UPDATE:
-        draw_screen();
-        break;
-
-    case TMT_MSG_MOVED:
-        /* Cursor moved - redraw old and new positions */
-        draw_screen();
-        break;
-
     case TMT_MSG_ANSWER:
         /* Send response to terminal */
         if (a)
@@ -422,10 +398,22 @@ term(void)
             if (!gotexpose)
                 break;
             if ((in = read(termfd, buf, sizeof(buf))) > 0) {
+                int present = 1;
+
+                for (long i = in - 1; i >= 0; i--) {
+                    if (buf[i] == '\r')
+                        continue;
+                    present = (buf[i] != '\n');
+                    break;
+                }
+
                 hide_cursor();
                 tmt_write(vt, (char *)buf, in);
-                if (havefocus)
-                    draw_cursor();
+                if (present) {
+                    draw_screen();
+                    if (havefocus)
+                        draw_cursor();
+                }
             }
             break;
 
